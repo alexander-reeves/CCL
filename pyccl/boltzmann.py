@@ -45,6 +45,7 @@ def get_camb_pk_lin(cosmo, *, nonlin=False):
     zs = np.clip(zs, 0, np.inf)
 
     # deal with normalization
+    import numpy as np
     if np.isfinite(cosmo["A_s"]):
         A_s_fid = cosmo["A_s"]
     elif np.isfinite(cosmo["sigma8"]):
@@ -435,6 +436,7 @@ def get_class_pk_lin(cosmo):
     params["T_cmb"] = cosmo["T_CMB"]
 
     # if we have sigma8, we need to find A_s
+    import numpy as np
     if np.isfinite(cosmo["A_s"]):
         params["A_s"] = cosmo["A_s"]
     elif np.isfinite(cosmo["sigma8"]):
@@ -447,6 +449,95 @@ def get_class_pk_lin(cosmo):
             "Could not normalize the linear power spectrum. "
             "A_s = %f, sigma8 = %f" % (
                 cosmo['A_s'], cosmo['sigma8']))
+
+    # --- AR EDE-specific changes ---
+    # if getattr(cosmo, 'fEDE', 0) != 0:
+    #     params['fEDE'] = cosmo.fEDE
+    #     params['thetai_scf'] = cosmo.thetai_scf
+    #     params['log10z_c'] = cosmo.log10z_c
+    #     # Add the fixed parameters required for the EDE version of CLASS.
+    #     params.update({
+    #         'Omega_Lambda': 0.0,
+    #         'Omega_fld': 0,
+    #         'Omega_scf': -1,
+    #         'n_scf': 3,
+    #         'CC_scf': 1,
+    #         'scf_tuning_index': 3,
+    #         'scf_parameters': '1, 1, 1, 1, 1, 0.0',
+    #         'attractor_ic_scf': 'no'
+    #     })
+
+    #     print("EDE!")
+
+    #switch to axiclassy set up 
+    if getattr(cosmo, 'fraction_axion_ac', 0) != 0:
+        import axiclassy as classy 
+        # Add the fixed parameters required for the EDE version of CLASS.
+        params.update({
+                        "scf_potential":      "axion",
+                        "n_axion":            3,
+                        "log10_axion_ac":     cosmo.log10_axion_ac,
+                        "fraction_axion_ac":  cosmo.fraction_axion_ac,
+                        # initial mis-alignment angle θ_i (default ≃ 2.72 rad) and ϕ̇_i = 0
+                        "scf_parameters":    cosmo.scf_parameters,
+                        "scf_evolve_as_fluid":False, 
+                        "scf_evolve_like_axionCAMB":False, 
+                        "scf_has_perturbations":True, 
+                        "attractor_ic_scf":False, 
+                        "compute_phase_shift":False, 
+                        "include_scf_in_delta_m":True, 
+                        "include_scf_in_delta_cb":True,
+                        "loop_over_background_for_closure_relation": "yes", 
+                        "do_shooting":  "yes",
+                        "do_shooting_scf": "yes",
+                    })
+
+        print("axiclassy EDE set up!")
+
+    # switch to modrec set up
+    modrec_params = {}
+    list_of_control_points = []
+    for i in range(1, 8):
+        q_key = f'q_{i}'
+        q_val = getattr(cosmo, q_key, None)
+        if q_val is not None:
+            modrec_params[q_key] = q_val
+            list_of_control_points.append(q_val)
+        else:
+            list_of_control_points.append(0.0)
+    
+    if modrec_params:
+        print("ModRec model set up!")
+        # Set up modrec recombination parameters for CLASS
+        modrec_model = {
+            "zmin": 533.333333,
+            "zmax": 1600,
+            "nfree": 7
+        }
+        
+        # Create pivot points (evenly spaced between zmin and zmax)
+        import numpy as np
+        pivots = np.linspace(modrec_model["zmin"], modrec_model["zmax"],
+                             modrec_model["nfree"] + 2)
+        pivots_str = ",".join(["{:.4f}".format(p) for p in pivots])
+        
+        # Create control points string: 0.0, q_1, q_2, ..., q_7, 0.0
+        cp_list = [0.0] + list_of_control_points + [0.0]
+        cp_str = ",".join(["{:.4e}".format(c) for c in cp_list])
+        
+        # Add modrec recombination settings
+        recombination_settings = {
+            'xe_pert_type': "control",
+            'xe_pert_num': modrec_model["nfree"] + 2,
+            'xe_control_pivots': pivots_str,
+            'zmin_pert': modrec_model["zmin"],
+            'zmax_pert': modrec_model["zmax"],
+            "xe_interp_type": "cubic",
+            "xe_control_is_bounded": "yes",
+            "xe_control_points": cp_str,
+        }
+        
+        params.update(recombination_settings)
 
     model = None
     try:

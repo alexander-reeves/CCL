@@ -242,7 +242,23 @@ class Cosmology(CCLObject):
             matter_power_spectrum='halofit',
             baryonic_effects=None,
             mg_parametrization=None,
-            extra_parameters=None):
+            extra_parameters=None, 
+            # fEDE=0,            # AR: fraction of early dark energy
+            # thetai_scf=2.83,    # AR: initial value of the scalar field
+            # log10z_c=3.562         # AR: logarithm of the critical redshift
+            #switch to axiclassy set up 
+            fraction_axion_ac=0., 
+            log10_axion_ac=3.5, 
+            scf_parameters="2.86,0.0",
+            # modrec parameters
+            q_1=None,
+            q_2=None,
+            q_3=None,
+            q_4=None,
+            q_5=None,
+            q_6=None,
+            q_7=None
+            ):
 
         if Neff is None:
             Neff = 3.044
@@ -294,6 +310,22 @@ class Cosmology(CCLObject):
                 modified_gravity.MuSigmaMG):
             raise NotImplementedError("`mg_parametrization` only supports the "
                                       "mu-Sigma parametrization at this point")
+
+        # AR: save the extra EDE parameters
+        # self.fEDE = fEDE
+        # self.thetai_scf = thetai_scf
+        # self.log10z_c = log10z_c
+        self.fraction_axion_ac = fraction_axion_ac
+        self.log10_axion_ac = log10_axion_ac
+        self.scf_parameters = scf_parameters
+        # AR: save modrec parameters
+        self.q_1 = q_1
+        self.q_2 = q_2
+        self.q_3 = q_3
+        self.q_4 = q_4
+        self.q_5 = q_5
+        self.q_6 = q_6
+        self.q_7 = q_7
 
         # going to save these for later
         self._params_init_kwargs = dict(
